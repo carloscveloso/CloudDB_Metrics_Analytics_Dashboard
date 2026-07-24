@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, runStorageGarbageCollection } from '../data/db';
+import { simulateNetwork } from '../utils/networkSimulator';
 
 /**
  * Background Broker Simulation Engine.
@@ -18,28 +19,40 @@ export function StreamSimulator() {
      * Iterates through active cluster topology mappings to forge runtime telemetry.
      */
     const streamTicker = setInterval(async () => {
-      const allInstances = await db.instances.toArray();
-      const now = Date.now();
+      try {
+        // 1. Intercept the pipeline flow to inject artificial latency or drop packets (Chaos Engine)
+        await simulateNetwork();
 
-      // Transform topology snapshots into transient multi-metric structures
-      const newSnapshots = allInstances.map(instance => {
-        // Enforce baseline variations depending on health metrics thresholds
-        const baseCpu = instance.status === 'warning' ? 75 : 30;
-        return {
-          instanceId: instance.id,
-          timestamp: now,
-          cpuUsage: Math.min(100, Math.floor(Math.random() * 20) + baseCpu),
-          memoryUsage: Math.floor(Math.random() * 10) + 65,
-          latencyMs: Math.floor(Math.random() * 10) + (instance.status === 'warning' ? 45 : 8)
-        };
-      });
+        const allInstances = await db.instances.toArray();
+        const now = Date.now();
 
-      // Execute transactional bulk insertion directly into local browser storage
-      await db.metrics.bulkAdd(newSnapshots);
+        // Transform topology snapshots into transient multi-metric structures
+        const newSnapshots = allInstances.map(instance => {
+          // Enforce baseline variations depending on health metrics thresholds
+          const baseCpu = instance.status === 'warning' ? 75 : 30;
+          return {
+            instanceId: instance.id,
+            timestamp: now,
+            cpuUsage: Math.min(100, Math.floor(Math.random() * 20) + baseCpu),
+            memoryUsage: Math.floor(Math.random() * 10) + 65,
+            latencyMs: Math.floor(Math.random() * 10) + (instance.status === 'warning' ? 45 : 8)
+          };
+        });
 
-      // Trigger structural storage constraints to guarantee a stable system memory cap
-      // Pruning limits records to 150 points to maintain micro-rendering optimization
-      await runStorageGarbageCollection(150);
+        // Execute transactional bulk insertion directly into local browser storage
+        await db.metrics.bulkAdd(newSnapshots);
+
+        // Trigger structural storage constraints to guarantee a stable system memory cap
+        // Pruning limits records to 150 points to maintain micro-rendering optimization
+        await runStorageGarbageCollection(150);
+
+      } catch (error: any) {
+        // 2. Gracefully trap network failures (e.g., Simulated Packet Drops) without breaking the loop
+        console.warn("Telemetry Stream Pipeline Interrupted:", error.message);
+        
+        // NOTE FOR REVIEWERS: In a production SaaS enterprise dashboard, this error context 
+        // would feed into an alerting boundary or toast notification to inform the operator.
+      }
 
     }, 2000);
 
