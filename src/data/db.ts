@@ -1,15 +1,20 @@
 import Dexie, { type Table } from 'dexie';
 import type { DBInstance, MetricSnapshot } from '../types';
-export { type DBInstance, type MetricSnapshot } from '../types';
 
-// 1. Definição da base de dados embutida no browser
+// Export explicit data types for your Hooks and Component render layers
+export type { DBInstance, MetricSnapshot };
+
+/**
+ * Client-Side Embedded Browser Storage Architecture.
+ * Establishes structured, indexed tables for time-series log analysis.
+ */
 class CloudDBDatabase extends Dexie {
   instances!: Table<DBInstance>;
   metrics!: Table<MetricSnapshot>;
 
   constructor() {
     super('CloudDB_Metrics_Dashboard');
-    // Indexamos os campos que vamos usar para filtros (queries rápidas)
+    // Index specific fields to run fast filtering queries in the browser
     this.version(1).stores({
       instances: 'id, provider, status',
       metrics: '++id, instanceId, timestamp'
@@ -19,12 +24,14 @@ class CloudDBDatabase extends Dexie {
 
 export const db = new CloudDBDatabase();
 
-// 2. Função para popular (semear) o browser caso esteja vazio
+/**
+ * Database Seeding Engine.
+ * Automatically populates the browser database on the application's first launch.
+ */
 export async function seedDatabaseIfEmpty() {
   const instanceCount = await db.instances.count();
-  if (instanceCount > 0) return; // Se já existir dados, não faz nada
+  if (instanceCount > 0) return; 
 
-  // Dados simulados de infraestrutura para o contexto da vaga
   const mockInstances: DBInstance[] = [
     { id: 'db-prod-pg', name: 'Production-Postgres', provider: 'AWS', status: 'healthy', region: 'us-east-1' },
     { id: 'db-analytics-ch', name: 'Analytics-ClickHouse', provider: 'GCP', status: 'warning', region: 'europe-west1' },
@@ -37,12 +44,9 @@ export async function seedDatabaseIfEmpty() {
   const now = Date.now();
   const oneHour = 60 * 60 * 1000;
 
-  // Cria 24 pontos de dados históricos para cada base de dados simulada
   mockInstances.forEach((instance) => {
     for (let i = 24; i >= 0; i--) {
       const timestamp = now - i * oneHour;
-      
-      // Se a base de dados tiver o estado 'warning', simulamos carga alta no CPU
       const baseCpu = instance.status === 'warning' ? 75 : 30;
 
       metricsBatch.push({
@@ -56,6 +60,65 @@ export async function seedDatabaseIfEmpty() {
   });
 
   await db.metrics.bulkAdd(metricsBatch);
-  console.log('IndexedDB: Base de dados embutida semeada com sucesso!');
+  console.log('IndexedDB: Local browser environment database successfully seeded!');
 }
 
+/**
+ * Asynchronous Data Garbage Collector (Storage Pruning Utility).
+ * Keeps only the most recent snapshots to protect browser memory performance.
+ */
+export async function runStorageGarbageCollection(maxRecordsAllowed: number = 200) {
+  try {
+    const totalRecords = await db.metrics.count();
+    if (totalRecords <= maxRecordsAllowed) return;
+
+    const recordsToDeleteCount = totalRecords - maxRecordsAllowed;
+    const legacyKeysCollection = await db.metrics
+      .orderBy('timestamp')
+      .limit(recordsToDeleteCount)
+      .primaryKeys();
+
+    if (legacyKeysCollection.length > 0) {
+      await db.metrics.bulkDelete(legacyKeysCollection);
+      console.log(`[Storage GC]: Safely purged ${legacyKeysCollection.length} stale telemetric log snapshots.`);
+    }
+  } catch (error) {
+    console.error("Storage Garbage Collection loop encountered an exception:", error);
+  }
+}
+
+// Global runtime variables moved to the root level to prevent syntax conflicts
+export let IS_CHAOS_MODE_ACTIVE = false;
+
+export function setChaosMode(isActive: boolean) {
+  IS_CHAOS_MODE_ACTIVE = isActive;
+  console.log(`[Chaos Engine]: Simulation state shifted. Active = ${isActive}`);
+}
+
+/**
+ * Utility to extract metrics from IndexedDB and convert them to a CSV string.
+ * Demonstrates client-side data parsing and processing pipelines.
+ */
+export async function exportMetricsToCSV(instanceId: string): Promise<string> {
+  const records = await db.metrics
+    .where('instanceId')
+    .equals(instanceId)
+    .sortBy('timestamp');
+
+  if (records.length === 0) return '';
+
+  // Define headers for our database report file
+  const headers = ['Timestamp', 'Instance ID', 'CPU Usage (%)', 'Memory Usage (%)', 'Latency (ms)'];
+  
+  // Map rows into clean comma-separated strings
+  const csvRows = records.map(record => [
+    new Date(record.timestamp).toISOString(),
+    record.instanceId,
+    record.cpuUsage,
+    record.memoryUsage,
+    record.latencyMs
+  ].join(','));
+
+  // Combine headers and rows with a newline character break
+  return [headers.join(','), ...csvRows].join('\n');
+}

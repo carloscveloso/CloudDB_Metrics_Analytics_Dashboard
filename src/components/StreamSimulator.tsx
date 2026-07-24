@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { db } from '../data/db';
+import { db, runStorageGarbageCollection } from '../data/db';
 
 export function StreamSimulator() {
   const [isStreaming, setIsStreaming] = useState(true);
@@ -24,6 +24,11 @@ export function StreamSimulator() {
 
       // Appending streaming telemetry directly into browser storage asynchronously
       await db.metrics.bulkAdd(newSnapshots);
+
+      // TRIGGER GARBAGE COLLECTION ENGINE HERE: Enforce a strict safe cap limit
+      // Since we simulate 3 metrics streams at once, capping at 150 points keeps the charts clean
+      await runStorageGarbageCollection(150);
+
     }, 2000);
 
     return () => clearInterval(streamTicker);
