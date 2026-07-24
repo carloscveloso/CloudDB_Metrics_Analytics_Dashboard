@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react';
 import { db, runStorageGarbageCollection } from '../data/db';
 
+/**
+ * Background Broker Simulation Engine.
+ * Emulates live real-time network pipelines by appending dynamic telemetry into IndexedDB.
+ */
 export function StreamSimulator() {
+  // Operational toggle to control the telemetry injection pipeline loop
   const [isStreaming, setIsStreaming] = useState(true);
 
   useEffect(() => {
+    // Short-circuit the lifecycle interval if data ingestion is paused by user
     if (!isStreaming) return;
 
+    /**
+     * Active background event dispatcher.
+     * Iterates through active cluster topology mappings to forge runtime telemetry.
+     */
     const streamTicker = setInterval(async () => {
       const allInstances = await db.instances.toArray();
       const now = Date.now();
 
+      // Transform topology snapshots into transient multi-metric structures
       const newSnapshots = allInstances.map(instance => {
+        // Enforce baseline variations depending on health metrics thresholds
         const baseCpu = instance.status === 'warning' ? 75 : 30;
         return {
           instanceId: instance.id,
@@ -22,15 +34,16 @@ export function StreamSimulator() {
         };
       });
 
-      // Appending streaming telemetry directly into browser storage asynchronously
+      // Execute transactional bulk insertion directly into local browser storage
       await db.metrics.bulkAdd(newSnapshots);
 
-      // TRIGGER GARBAGE COLLECTION ENGINE HERE: Enforce a strict safe cap limit
-      // Since we simulate 3 metrics streams at once, capping at 150 points keeps the charts clean
+      // Trigger structural storage constraints to guarantee a stable system memory cap
+      // Pruning limits records to 150 points to maintain micro-rendering optimization
       await runStorageGarbageCollection(150);
 
     }, 2000);
 
+    // Lifecycle cleanup phase to dismantle asynchronous memory bindings on unmount
     return () => clearInterval(streamTicker);
   }, [isStreaming]);
 
@@ -45,6 +58,7 @@ export function StreamSimulator() {
       border: '1px solid #dee2e6',
       boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
     }}>
+      {/* Real-time Visual Status Indicator Light */}
       <div style={{
         width: '10px',
         height: '10px',
@@ -52,9 +66,13 @@ export function StreamSimulator() {
         backgroundColor: isStreaming ? '#2563eb' : '#9ca3af',
         animation: isStreaming ? 'pulse 1.5s infinite ease-in-out' : 'none'
       }} />
+      
+      {/* Status Meta Description Display */}
       <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
         Background Broker Engine: <strong>{isStreaming ? 'STREAMING ACTIVE' : 'PAUSED'}</strong>
       </span>
+      
+      {/* Broker Activity Pipeline Interrupter Switch Toggle */}
       <button
         onClick={() => setIsStreaming(!isStreaming)}
         style={{
@@ -72,6 +90,7 @@ export function StreamSimulator() {
         {isStreaming ? 'Pause Feed' : 'Resume Feed'}
       </button>
 
+      {/* Embedded Animation Configurations for the Status Node Flash Effect */}
       <style>{`
         @keyframes pulse {
           0% { transform: scale(0.95); opacity: 0.5; }
