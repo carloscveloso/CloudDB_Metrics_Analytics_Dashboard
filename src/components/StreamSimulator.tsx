@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { db, runStorageGarbageCollection } from '../data/db';
+import { db, runStorageGarbageCollection, IS_CHAOS_MODE_ACTIVE } from '../data/db';
 import { simulateNetwork } from '../utils/networkSimulator';
 
 /**
@@ -29,13 +29,17 @@ export function StreamSimulator() {
         // Transform topology snapshots into transient multi-metric structures
         const newSnapshots = allInstances.map(instance => {
           // Enforce baseline variations depending on health metrics thresholds
-          const baseCpu = instance.status === 'warning' ? 75 : 30;
+          const isCrisisActive = IS_CHAOS_MODE_ACTIVE || instance.status === 'warning';
+          const currentBaseCpu = isCrisisActive ? 80 : 25;
+          const currentBaseRam = isCrisisActive ? 85 : 45;
+          const currentBaseLatency = isCrisisActive ? 90 : 8;
+
           return {
             instanceId: instance.id,
             timestamp: now,
-            cpuUsage: Math.min(100, Math.floor(Math.random() * 20) + baseCpu),
-            memoryUsage: Math.floor(Math.random() * 10) + 65,
-            latencyMs: Math.floor(Math.random() * 10) + (instance.status === 'warning' ? 45 : 8)
+            cpuUsage: Math.min(100, Math.floor(Math.random() * 15) + currentBaseCpu),
+            memoryUsage: Math.min(100, Math.floor(Math.random() * 10) + currentBaseRam),
+            latencyMs: Math.floor(Math.random() * 8) + currentBaseLatency
           };
         });
 
@@ -44,12 +48,12 @@ export function StreamSimulator() {
 
         // Trigger structural storage constraints to guarantee a stable system memory cap
         // Pruning limits records to 150 points to maintain micro-rendering optimization
-        await runStorageGarbageCollection(150);
+        await runStorageGarbageCollection(50);
 
       } catch (error: any) {
         // 2. Gracefully trap network failures (e.g., Simulated Packet Drops) without breaking the loop
         console.warn("Telemetry Stream Pipeline Interrupted:", error.message);
-        
+
         // NOTE FOR REVIEWERS: In a production SaaS enterprise dashboard, this error context 
         // would feed into an alerting boundary or toast notification to inform the operator.
       }
@@ -79,12 +83,12 @@ export function StreamSimulator() {
         backgroundColor: isStreaming ? '#2563eb' : '#9ca3af',
         animation: isStreaming ? 'pulse 1.5s infinite ease-in-out' : 'none'
       }} />
-      
+
       {/* Status Meta Description Display */}
       <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
         Background Broker Engine: <strong>{isStreaming ? 'STREAMING ACTIVE' : 'PAUSED'}</strong>
       </span>
-      
+
       {/* Broker Activity Pipeline Interrupter Switch Toggle */}
       <button
         onClick={() => setIsStreaming(!isStreaming)}

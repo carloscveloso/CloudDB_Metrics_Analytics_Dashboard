@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db, DBInstance, MetricSnapshot } from '../data/db';
 
 /**
