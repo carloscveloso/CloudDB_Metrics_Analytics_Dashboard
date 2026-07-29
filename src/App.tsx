@@ -23,7 +23,7 @@ function App() {
       .catch((err: any) => console.error("Database initialization failed:", err));
   }, []);
 
-  const { instances, metrics, loading } = useMetrics(selectedInstance, timeWindow);
+  const { instances, metrics, loading, error } = useMetrics(selectedInstance, timeWindow);
 
   const [streamTick, setStreamTick] = useState<number>(0);
   useEffect(() => {
@@ -91,6 +91,53 @@ function App() {
       }}>
         <h2 style={{ color: '#0a0a0a', fontWeight: 700, margin: 0 }}>⚡ CloudDB Systems</h2>
         <p style={{ color: '#666666', fontSize: '0.9rem', marginTop: '0.5rem' }}>Bootstrapping asynchronous browser storage engine...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        padding: '3rem',
+        textAlign: 'center',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        backgroundColor: '#fafafa',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: '1rem'
+      }}>
+        <div style={{ color: '#dc2626', fontSize: '3rem' }}>⚠️</div>
+        <h2 style={{ color: '#0a0a0a', fontWeight: 700, margin: 0 }}>Error Loading Metrics</h2>
+        <p style={{ color: '#666666', fontSize: '0.9rem', maxWidth: '400px' }}>
+          {error.message || 'An unexpected error occurred while loading telemetry data.'}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '0.5rem 1.5rem',
+            borderRadius: '6px',
+            border: '1px solid #dc2626',
+            backgroundColor: '#ffffff',
+            color: '#dc2626',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = '#dc2626';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.color = '#dc2626';
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -236,14 +283,6 @@ function App() {
                 </h2>
                 <p style={{ color: '#888', fontSize: '0.75rem', marginTop: 0, marginBottom: '1rem' }}>Audit browser memory heap pressure and render cycles driven by active state transitions.</p>
                 <WebVitalsMonitor streamTick={streamTick} />
-              </div>
-
-              <div style={{ marginTop: '1rem' }}>
-                <h2 style={{ fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem', color: '#666666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Local-First Persistent Storage Matrix
-                </h2>
-                <p style={{ color: '#888', fontSize: '0.75rem', marginTop: 0, marginBottom: '1rem' }}>Monitors the local browser IndexedDB / Dexie engine block allocation footprint in real-time.</p>
-                <StorageMonitor streamTick={streamTick} />
               </div>
             </div>
 

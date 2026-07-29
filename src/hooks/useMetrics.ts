@@ -14,6 +14,7 @@ export function useMetrics(selectedInstanceId: string | null, timeWindowHours: n
   const [instances, setInstances] = useState<DBInstance[]>([]);
   const [metrics, setMetrics] = useState<MetricSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null); // 🆕 NOVO: estado para erro
 
   // Initial bootstrap sequence: Fetch active cluster node topology mappings exactly once
   useEffect(() => {
@@ -23,6 +24,7 @@ export function useMetrics(selectedInstanceId: string | null, timeWindowHours: n
         setInstances(allInstances);
       } catch (error) {
         console.error("Failed to load cluster topology states:", error);
+        setError(error as Error); // 🆕 Guarda o erro no carregamento das instâncias
       }
     }
     loadInstances();
@@ -31,7 +33,10 @@ export function useMetrics(selectedInstanceId: string | null, timeWindowHours: n
   // Telemetry Ingestion Loop: Query metrics reactively from IndexedDB cache
   useEffect(() => {
     // Prevent database query crashes by short-circuiting if no node is chosen
-    if (!selectedInstanceId) return;
+    if (!selectedInstanceId) {
+      setLoading(false);
+      return;
+    }
 
     // Operational flag to prevent state mutation updates on unmounted component viewports
     let isMounted = true;
@@ -42,6 +47,10 @@ export function useMetrics(selectedInstanceId: string | null, timeWindowHours: n
      */
     async function queryMetricsPipeline() {
       try {
+        // 🆕 Reset erro anterior e ativa loading
+        setError(null);
+        setLoading(true);
+
         // Calculate the oldest timestamp log entry allowed within the selected window scope
         const cutoffTime = Date.now() - timeWindowHours * 60 * 60 * 1000;
 
@@ -57,10 +66,19 @@ export function useMetrics(selectedInstanceId: string | null, timeWindowHours: n
         // Safely update layout states only if the mounting lifespan is active
         if (isMounted) {
           setMetrics(records);
+        }
+      } catch (err) {
+        // 🆕 Captura e guarda o erro
+        console.error("Error querying time-series telemetric records:", err);
+        if (isMounted) {
+          setError(err as Error);
+          setMetrics([]); // Limpa os dados anteriores em caso de erro
+        }
+      } finally {
+        // 🆕 Garante que o loading é desativado mesmo com erro
+        if (isMounted) {
           setLoading(false);
         }
-      } catch (error) {
-        console.error("Error querying time-series telemetric records:", error);
       }
     }
 
@@ -77,5 +95,6 @@ export function useMetrics(selectedInstanceId: string | null, timeWindowHours: n
     };
   }, [selectedInstanceId, timeWindowHours]); // Instantly recreates the query profile on dashboard filter events
 
-  return { instances, metrics, loading };
+  // 🆕 Retorna o erro também para a UI poder reagir
+  return { instances, metrics, loading, error };
 }
