@@ -4,7 +4,7 @@ import { Header } from './components/layout/Header';
 import { AppLayout } from './components/layout/AppLayout';
 import { seedDatabaseIfEmpty, exportMetricsToCSV } from './data/db';
 import { useMetrics } from './hooks/useMetrics';
-import { useSystem } from './context/SystemContext'; // ← IMPORT DO CONTEXT
+import { useSystem } from './contexts/SystemContext'; // ← IMPORT DO CONTEXT
 
 function App() {
   const [isDbReady, setIsDbReady] = useState<boolean>(false);
