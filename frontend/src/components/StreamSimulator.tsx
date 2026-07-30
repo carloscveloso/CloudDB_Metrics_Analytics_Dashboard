@@ -1,68 +1,80 @@
+// frontend/src/components/StreamSimulator.tsx
 import { useEffect, useState } from 'react';
-import { db, runStorageGarbageCollection, IS_CHAOS_MODE_ACTIVE } from '../data/db';
+import { metricsService } from '../services/metricsService';
+import { instancesService } from '../services/instancesService';
+import { db, runStorageGarbageCollection } from '../data/db';
 import { simulateNetwork } from '../utils/networkSimulator';
 
-/**
- * Background Broker Simulation Engine.
- * Emulates live real-time network pipelines by appending dynamic telemetry into IndexedDB.
- */
 export function StreamSimulator() {
-  // Operational toggle to control the telemetry injection pipeline loop
   const [isStreaming, setIsStreaming] = useState(true);
+  const [useApi, setUseApi] = useState(true);
 
   useEffect(() => {
-    // Short-circuit the lifecycle interval if data ingestion is paused by user
     if (!isStreaming) return;
 
-    /**
-     * Active background event dispatcher.
-     * Iterates through active cluster topology mappings to forge runtime telemetry.
-     */
     const streamTicker = setInterval(async () => {
       try {
-        // 1. Intercept the pipeline flow to inject artificial latency or drop packets (Chaos Engine)
+        // 1. Simular latência/packet loss
         await simulateNetwork();
 
-        const allInstances = await db.instances.toArray();
+        // 2. Buscar instâncias (tenta API primeiro)
+        let allInstances;
+        try {
+          allInstances = await instancesService.getAll();
+          setUseApi(true);
+        } catch (apiError) {
+          console.warn('API failed, using IndexedDB for instances:', apiError);
+          setUseApi(false);
+          allInstances = await db.instances.toArray();
+        }
+
         const now = Date.now();
 
-        // Transform topology snapshots into transient multi-metric structures
-        const newSnapshots = allInstances.map(instance => {
-          // Enforce baseline variations depending on health metrics thresholds
-          const isCrisisActive = IS_CHAOS_MODE_ACTIVE || instance.status === 'warning';
+        // 3. Criar métricas
+        const newSnapshots = allInstances.map((instance: any) => {
+          const isCrisisActive = instance.status === 'warning' || instance.status === 'critical';
           const currentBaseCpu = isCrisisActive ? 80 : 25;
           const currentBaseRam = isCrisisActive ? 85 : 45;
           const currentBaseLatency = isCrisisActive ? 90 : 8;
 
           return {
             instanceId: instance.id,
-            timestamp: now,
             cpuUsage: Math.min(100, Math.floor(Math.random() * 15) + currentBaseCpu),
             memoryUsage: Math.min(100, Math.floor(Math.random() * 10) + currentBaseRam),
-            latencyMs: Math.floor(Math.random() * 8) + currentBaseLatency
+            latencyMs: Math.floor(Math.random() * 8) + currentBaseLatency,
           };
         });
 
-        // Execute transactional bulk insertion directly into local browser storage
-        await db.metrics.bulkAdd(newSnapshots);
+        // 4. Enviar para API (se disponível) ou IndexedDB
+        if (useApi) {
+          try {
+            await metricsService.createMetricsBatch(newSnapshots);
+          } catch (apiError) {
+            console.warn('API failed, using IndexedDB fallback:', apiError);
+            setUseApi(false);
+            await db.metrics.bulkAdd(
+              newSnapshots.map((s: any) => ({ ...s, timestamp: now }))
+            );
+          }
+        } else {
+          // Usar IndexedDB diretamente
+          await db.metrics.bulkAdd(
+            newSnapshots.map((s: any) => ({ ...s, timestamp: now }))
+          );
+        }
 
-        // Trigger structural storage constraints to guarantee a stable system memory cap
-        // Pruning limits records to 150 points to maintain micro-rendering optimization
-        await runStorageGarbageCollection(50);
+        // 5. Garbage collection (só para IndexedDB)
+        if (!useApi) {
+          await runStorageGarbageCollection(50);
+        }
 
       } catch (error: any) {
-        // 2. Gracefully trap network failures (e.g., Simulated Packet Drops) without breaking the loop
         console.warn("Telemetry Stream Pipeline Interrupted:", error.message);
-
-        // NOTE FOR REVIEWERS: In a production SaaS enterprise dashboard, this error context 
-        // would feed into an alerting boundary or toast notification to inform the operator.
       }
-
     }, 2000);
 
-    // Lifecycle cleanup phase to dismantle asynchronous memory bindings on unmount
     return () => clearInterval(streamTicker);
-  }, [isStreaming]);
+  }, [isStreaming, useApi]);
 
   return (
     <div style={{
@@ -75,7 +87,6 @@ export function StreamSimulator() {
       border: '1px solid #dee2e6',
       boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
     }}>
-      {/* Real-time Visual Status Indicator Light */}
       <div style={{
         width: '10px',
         height: '10px',
@@ -83,13 +94,10 @@ export function StreamSimulator() {
         backgroundColor: isStreaming ? '#2563eb' : '#9ca3af',
         animation: isStreaming ? 'pulse 1.5s infinite ease-in-out' : 'none'
       }} />
-
-      {/* Status Meta Description Display */}
       <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
         Background Broker Engine: <strong>{isStreaming ? 'STREAMING ACTIVE' : 'PAUSED'}</strong>
+        {!useApi && <span style={{ color: '#f59e0b', marginLeft: '0.5rem' }}>(Offline Mode)</span>}
       </span>
-
-      {/* Broker Activity Pipeline Interrupter Switch Toggle */}
       <button
         onClick={() => setIsStreaming(!isStreaming)}
         style={{
@@ -106,8 +114,6 @@ export function StreamSimulator() {
       >
         {isStreaming ? 'Pause Feed' : 'Resume Feed'}
       </button>
-
-      {/* Embedded Animation Configurations for the Status Node Flash Effect */}
       <style>{`
         @keyframes pulse {
           0% { transform: scale(0.95); opacity: 0.5; }

@@ -1,16 +1,18 @@
-// src/App.tsx - VERSÃO COM SYSTEM CONTEXT
+// frontend/src/App.tsx
 import { useState, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { AppLayout } from './components/layout/AppLayout';
 import { seedDatabaseIfEmpty, exportMetricsToCSV } from './data/db';
 import { useMetrics } from './hooks/useMetrics';
-import { useSystem } from './contexts/SystemContext'; // ← IMPORT DO CONTEXT
+import { useSystem } from './contexts/SystemContext';
+import { useAuth } from './contexts/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function App() {
   const [isDbReady, setIsDbReady] = useState<boolean>(false);
   const [streamTick, setStreamTick] = useState<number>(0);
-
-  // ✅ USAR CONTEXT
+  
+  // Usar contexts
   const {
     selectedInstance,
     timeWindow,
@@ -18,25 +20,27 @@ function App() {
     setSelectedInstance,
     setTimeWindow,
     setViewMode,
-  } = useSystem(); // ← Hook do Context
+  } = useSystem();
 
-  // Inicialização da base de dados (mantém igual)
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Inicialização da base de dados (fallback)
   useEffect(() => {
     seedDatabaseIfEmpty()
       .then(() => setIsDbReady(true))
       .catch((err: any) => console.error("Database initialization failed:", err));
   }, []);
 
-  // Streaming tick para atualizar monitores (mantém igual)
+  // Streaming tick
   useEffect(() => {
     const interval = setInterval(() => setStreamTick(t => t + 1), 2000);
     return () => clearInterval(interval);
   }, []);
 
-  // Busca métricas (mantém igual - usa selectedInstance e timeWindow do Context)
+  // Busca métricas
   const { instances, metrics, loading, error } = useMetrics(selectedInstance, timeWindow);
 
-  // Exportação CSV (mantém igual)
+  // Exportação CSV
   const handleCSVExport = async () => {
     if (!selectedInstance) return;
     try {
@@ -59,8 +63,8 @@ function App() {
     }
   };
 
-  // Loading state (mantém igual)
-  if (!isDbReady) {
+  // Loading state
+  if (!isDbReady || authLoading) {
     return (
       <div style={{
         padding: '3rem',
@@ -75,13 +79,13 @@ function App() {
       }}>
         <h2 style={{ color: '#0a0a0a', fontWeight: 700, margin: 0 }}>⚡ CloudDB Systems</h2>
         <p style={{ color: '#666666', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-          Bootstrapping asynchronous browser storage engine...
+          {!isDbReady ? 'Bootstrapping asynchronous browser storage engine...' : 'Loading...'}
         </p>
       </div>
     );
   }
 
-  // Error state (mantém igual)
+  // Error state
   if (error) {
     return (
       <div style={{
@@ -137,26 +141,24 @@ function App() {
       minHeight: '100vh',
       fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
     }}>
-      {/* ✅ Header agora usa viewMode e setViewMode do Context */}
-      <Header 
-        viewMode={viewMode} 
-        onToggleView={() => setViewMode(
-          viewMode === 'dashboard' ? 'diagnostics' : 'dashboard'
-        )} 
-      />
+      <Header viewMode={viewMode} onToggleView={() => setViewMode(
+        viewMode === 'dashboard' ? 'diagnostics' : 'dashboard'
+      )} />
 
-      <AppLayout
-        instances={instances}
-        metrics={metrics}
-        loading={loading}
-        selectedInstance={selectedInstance}
-        timeWindow={timeWindow}
-        viewMode={viewMode}
-        streamTick={streamTick}
-        onSelectInstance={setSelectedInstance}      // ← Função do Context
-        onTimeWindowChange={setTimeWindow}          // ← Função do Context
-        onExportCSV={handleCSVExport}
-      />
+      <ErrorBoundary>
+        <AppLayout
+          instances={instances}
+          metrics={metrics}
+          loading={loading}
+          selectedInstance={selectedInstance}
+          timeWindow={timeWindow}
+          viewMode={viewMode}
+          streamTick={streamTick}
+          onSelectInstance={setSelectedInstance}
+          onTimeWindowChange={setTimeWindow}
+          onExportCSV={handleCSVExport}
+        />
+      </ErrorBoundary>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// src/contexts/SystemContext.tsx
+// frontend/src/contexts/SystemContext.tsx
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { setChaosMode } from '../data/db';
 
@@ -7,6 +7,7 @@ interface SystemState {
   selectedInstance: string | null;
   timeWindow: number;
   viewMode: 'dashboard' | 'diagnostics';
+  theme: 'light' | 'dark';
 }
 
 interface SystemContextValue extends SystemState {
@@ -14,6 +15,7 @@ interface SystemContextValue extends SystemState {
   setSelectedInstance: (id: string | null) => void;
   setTimeWindow: (hours: number) => void;
   setViewMode: (mode: 'dashboard' | 'diagnostics') => void;
+  toggleTheme: () => void;
 }
 
 const SystemContext = createContext<SystemContextValue | undefined>(undefined);
@@ -24,12 +26,14 @@ export const SystemProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     selectedInstance: 'db-prod-pg',
     timeWindow: 24,
     viewMode: 'dashboard',
+    theme: 'light',
   });
 
   const toggleChaosMode = useCallback(() => {
     const newMode = !state.chaosMode;
     setState(prev => ({ ...prev, chaosMode: newMode }));
-    setChaosMode(newMode); // Sincroniza com a variável no db.ts
+    setChaosMode(newMode); // Sincroniza com o db.ts
+    console.log(`[Chaos Engine]: ${newMode ? 'ACTIVATED' : 'DEACTIVATED'}`);
   }, [state.chaosMode]);
 
   const setSelectedInstance = useCallback((id: string | null) => {
@@ -44,6 +48,13 @@ export const SystemProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setState(prev => ({ ...prev, viewMode: mode }));
   }, []);
 
+  const toggleTheme = useCallback(() => {
+    setState(prev => ({ 
+      ...prev, 
+      theme: prev.theme === 'light' ? 'dark' : 'light' 
+    }));
+  }, []);
+
   return (
     <SystemContext.Provider
       value={{
@@ -52,6 +63,7 @@ export const SystemProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setSelectedInstance,
         setTimeWindow,
         setViewMode,
+        toggleTheme,
       }}
     >
       {children}

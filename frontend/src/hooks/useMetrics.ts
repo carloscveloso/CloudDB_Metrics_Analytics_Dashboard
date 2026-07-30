@@ -1,98 +1,122 @@
-// src/hooks/useMetrics.ts - VERSÃO ORIGINAL RESTAURADA COM MELHORIAS
-import { useState, useEffect } from 'react';
+// frontend/src/hooks/useMetrics.ts
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { metricsService } from '../services/metricsService';
+import { instancesService } from '../services/instancesService';
 import { db, DBInstance, MetricSnapshot } from '../data/db';
 
-/**
- * Reactive Custom Hook for Orchestrating Telemetry Data Pipelines.
- * Bridges browser-native storage (IndexedDB) with layout presentation components.
- * Establishes real-time streaming subscriptions with optimal performance metrics.
- * 
- * @param selectedInstanceId The unique string identifier of the active database cluster node
- * @param timeWindowHours The historical time scope boundary (e.g., 1, 6, or 24 hours)
- */
 export function useMetrics(selectedInstanceId: string | null, timeWindowHours: number) {
   const [instances, setInstances] = useState<DBInstance[]>([]);
   const [metrics, setMetrics] = useState<MetricSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [useApi, setUseApi] = useState(true);
+  
+  // ← NOVO: Referência para controlar se é a primeira carga
+  const isFirstLoad = useRef(true);
 
-  // 🔄 Initial bootstrap sequence: Fetch active cluster node topology mappings exactly once
+  // 🔄 Buscar instâncias
   useEffect(() => {
     async function loadInstances() {
       try {
-        const allInstances = await db.instances.toArray();
+        const allInstances = await instancesService.getAll();
         setInstances(allInstances);
-      } catch (error) {
-        console.error("Failed to load cluster topology states:", error);
-        setError(error as Error);
+        setUseApi(true);
+      } catch (apiError) {
+        console.warn('API failed, using IndexedDB fallback for instances:', apiError);
+        try {
+          const allInstances = await db.instances.toArray();
+          setInstances(allInstances);
+          setUseApi(false);
+        } catch (dbError) {
+          console.error("Failed to load instances:", dbError);
+          setError(dbError as Error);
+        }
       }
     }
     loadInstances();
   }, []);
 
-  // 📈 Telemetry Ingestion Loop: Query metrics reactively from IndexedDB cache
-  useEffect(() => {
-    // Prevent database query crashes by short-circuiting if no node is chosen
+  // 📈 Buscar métricas (com controle de loading)
+  const fetchMetrics = useCallback(async (showLoading: boolean = false) => {
     if (!selectedInstanceId) {
       setLoading(false);
       return;
     }
 
-    // Operational flag to prevent state mutation updates on unmounted component viewports
-    let isMounted = true;
-
-    /**
-     * Executes localized time-series database lookups.
-     * Applies precise indexing rules and historical range restrictions.
-     */
-    async function queryMetricsPipeline() {
-      try {
-        // Reset error and set loading
+    try {
+      // ← NOVO: Só mostra loading se for pedido explicitamente
+      if (showLoading) {
         setError(null);
         setLoading(true);
+      }
 
-        // Calculate the oldest timestamp log entry allowed within the selected window scope
+      let data: MetricSnapshot[] = [];
+
+      if (useApi) {
+        try {
+          data = await metricsService.getMetrics({
+            instanceId: selectedInstanceId,
+            hours: timeWindowHours,
+          });
+        } catch (apiError) {
+          console.warn('API failed, using IndexedDB fallback:', apiError);
+          setUseApi(false);
+          const cutoffTime = Date.now() - timeWindowHours * 60 * 60 * 1000;
+          data = await db.metrics
+            .where('instanceId')
+            .equals(selectedInstanceId)
+            .and(item => item.timestamp >= cutoffTime)
+            .sortBy('timestamp');
+        }
+      } else {
         const cutoffTime = Date.now() - timeWindowHours * 60 * 60 * 1000;
-
-        // Query the indexed table using sub-millisecond primary key lookup constraints.
-        const records = await db.metrics
+        data = await db.metrics
           .where('instanceId')
-          .equals(selectedInstanceId!)
+          .equals(selectedInstanceId)
           .and(item => item.timestamp >= cutoffTime)
           .sortBy('timestamp');
+      }
 
-        // Safely update layout states only if the mounting lifespan is active
-        if (isMounted) {
-          setMetrics(records);
-        }
-      } catch (err) {
-        // Capture and store the error
-        console.error("Error querying time-series telemetric records:", err);
-        if (isMounted) {
-          setError(err as Error);
-          setMetrics([]); // Clear previous data on error
-        }
-      } finally {
-        // Ensure loading is disabled even on error
-        if (isMounted) {
-          setLoading(false);
-        }
+      // ← NOVO: Update suave (sem flash)
+      setMetrics(data);
+    } catch (err) {
+      console.error("Error fetching metrics:", err);
+      setError(err as Error);
+      setMetrics([]);
+    } finally {
+      // ← NOVO: Só desativa loading se estiver ativo
+      if (showLoading) {
+        setLoading(false);
       }
     }
+  }, [selectedInstanceId, timeWindowHours, useApi]);
 
-    // Immediate initial execution cycle to populate charts instantly on mount
-    queryMetricsPipeline();
+  // Efeito principal
+  useEffect(() => {
+    let isMounted = true;
 
-    // Poll the local database every 2000ms to seamlessly capture streaming broker data injections
-    const dynamicStreamInterval = setInterval(queryMetricsPipeline, 2000);
+    const fetchAndUpdate = async () => {
+      if (!isMounted) return;
+      
+      // ← NOVO: Primeira carga mostra loading, as seguintes NÃO
+      const shouldShowLoading = isFirstLoad.current;
+      await fetchMetrics(shouldShowLoading);
+      
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+      }
+    };
 
-    // Tear down intervals and disable asynchronous state updates on unmount boundaries
+    fetchAndUpdate();
+
+    // Polling a cada 2 segundos (SEM loading)
+    const interval = setInterval(fetchAndUpdate, 2000);
+
     return () => {
       isMounted = false;
-      clearInterval(dynamicStreamInterval);
+      clearInterval(interval);
     };
-  }, [selectedInstanceId, timeWindowHours]); // Instantly recreates the query profile on dashboard filter events
+  }, [fetchMetrics]);
 
-  // Return all states including error for UI to react
   return { instances, metrics, loading, error };
 }

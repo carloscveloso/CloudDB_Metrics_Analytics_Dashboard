@@ -1,168 +1,69 @@
-// types/index.ts - VERSÃO MELHORADA
-// ============================================
-// 1. TIPOS BASE (já existentes, com melhorias)
-// ============================================
+// frontend/src/types/index.ts
 
 export interface DBInstance {
-    id: string;
-    name: string;
-    provider: 'AWS' | 'GCP' | 'Azure';
-    status: 'healthy' | 'warning' | 'critical';
-    region: string;
-    // NOVOS campos para SaaS:
-    userId?: string;       // Dono da instância
-    tenantId?: string;     // Multi-tenant isolation
-    createdAt?: string;    // ISO date
-    updatedAt?: string;    // ISO date
+  id: string;
+  name: string;
+  provider: 'AWS' | 'GCP' | 'Azure';
+  status: 'healthy' | 'warning' | 'critical';
+  region: string;
+  userId?: string;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface MetricSnapshot {
-    id?: string;
-    instanceId: string;
-    timestamp: number;     // Unix timestamp (ms)
-    cpuUsage: number;      // percentage (0-100)
-    memoryUsage: number;   // percentage (0-100)
-    latencyMs: number;     // milliseconds
-    // NOVOS campos para SaaS:
-    userId?: string;       // Quem criou a métrica
-    tenantId?: string;     // Multi-tenant isolation
-    createdAt?: string;    // ISO date
+  id?: string;
+  instanceId: string;
+  timestamp: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  latencyMs: number;
+  userId?: string;
+  tenantId?: string;
+  createdAt?: string;
 }
 
-// ============================================
-// 2. NOVOS TIPOS PARA AUTENTICAÇÃO
-// ============================================
-
+// Autenticação
 export interface User {
-    id: string;
-    email: string;
-    name: string;
-    role: 'USER' | 'ADMIN' | 'OWNER';
-    tenantId: string;
-    createdAt: string;
-    updatedAt: string;
+  id: string;
+  email: string;
+  name: string;
+  role: 'USER' | 'ADMIN' | 'OWNER';
+  tenantId: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
-export interface AuthTokens {
-    accessToken: string;
-    refreshToken?: string;
-    expiresIn: number;     // segundos
-}
-
-// ============================================
-// 3. NOVOS TIPOS PARA RESPOSTAS DA API
-// ============================================
-
+// Respostas da API
 export interface ApiResponse<T = any> {
-    data: T;
-    message?: string;
-    status: number;
-    timestamp: string;
+  data: T;
+  message?: string;
+  status: number;
+  success: boolean;
 }
 
 export interface PaginatedResponse<T> {
-    data: T[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
-export interface ErrorResponse {
-    error: string;
-    message: string;
-    status: number;
-    details?: Record<string, string[]>;
+export interface LoginCredentials {
+  email: string;
+  password: string;
 }
 
-// ============================================
-// 4. NOVOS TIPOS PARA STATS E AGREGADOS
-// ============================================
-
-export interface InstanceStats {
-    instanceId: string;
-    instanceName: string;
-    totalMetrics: number;
-    avgCpu: number;
-    avgMemory: number;
-    avgLatency: number;
-    maxCpu: number;
-    maxMemory: number;
-    maxLatency: number;
-    uptime: number;          // horas
-    lastMetricAt: string;    // ISO date
-    status: 'healthy' | 'warning' | 'critical';
+export interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
 }
 
-export interface MetricSummary {
-    instanceId: string;
-    instanceName: string;
-    latest: MetricSnapshot;
-    stats: {
-        avgCpu: number;
-        avgMemory: number;
-        avgLatency: number;
-        maxCpu: number;
-        maxMemory: number;
-        maxLatency: number;
-    };
-}
-
-// ============================================
-// 5. TIPOS PARA REQUESTS (DTOs)
-// ============================================
-
-export interface CreateInstanceDTO {
-    name: string;
-    provider: 'AWS' | 'GCP' | 'Azure';
-    region: string;
-    status?: 'healthy' | 'warning' | 'critical';
-}
-
-export interface UpdateInstanceDTO {
-    name?: string;
-    provider?: 'AWS' | 'GCP' | 'Azure';
-    region?: string;
-    status?: 'healthy' | 'warning' | 'critical';
-}
-
-export interface CreateMetricDTO {
-    instanceId: string;
-    cpuUsage: number;
-    memoryUsage: number;
-    latencyMs: number;
-}
-
-export interface MetricsQueryParams {
-    instanceId?: string;
-    hours?: number;
-    startDate?: string;     // ISO date
-    endDate?: string;       // ISO date
-    limit?: number;
-    offset?: number;
-}
-
-// ============================================
-// 6. TIPOS PARA O SISTEMA (UI State)
-// ============================================
-
-export interface SystemState {
-    selectedInstance: string | null;
-    timeWindow: number;      // horas
-    viewMode: 'dashboard' | 'diagnostics';
-    chaosMode: boolean;
-}
-
-export interface WebVitals {
-    renderTimeMs: number;
-    memoryProgress: number;
-    jsHeapSizeMB: number;
-    jsHeapLimitMB: number;
-}
-
-export interface StorageQuota {
-    usedMB: number;
-    totalMB: number;
-    percentage: number;
-    supported: boolean;
+export interface AuthResponse {
+  user: User;
+  accessToken: string;
+  refreshToken?: string;
 }
