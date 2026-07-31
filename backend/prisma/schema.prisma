@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"  // ou "sqlite" para testes
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // hashed com bcrypt
+  name      String
+  tenantId  String   @default("default")
+  role      String   @default("USER") // USER, ADMIN, OWNER
+  
+  instances Instance[]
+  metrics   Metric[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([email])
+}
+
+model Instance {
+  id        String   @id @default(uuid())
+  name      String
+  provider  String   // AWS, GCP, Azure
+  region    String
+  status    String   @default("healthy") // healthy, warning, critical
+  userId    String
+  tenantId  String   @default("default")
+  
+  user      User     @relation(fields: [userId], references: [id])
+  metrics   Metric[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Metric {
+  id          String   @id @default(uuid())
+  instanceId  String
+  timestamp   DateTime @default(now())
+  cpuUsage    Float
+  memoryUsage Float
+  latencyMs   Float
+  tenantId    String   @default("default")
+  userId      String
+  
+  instance    Instance @relation(fields: [instanceId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+  
+  @@index([instanceId])
+  @@index([timestamp])
+  @@index([tenantId])
+  @@index([instanceId, timestamp])
+  @@index([userId])
+}
