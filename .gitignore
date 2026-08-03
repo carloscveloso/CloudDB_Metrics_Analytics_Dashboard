@@ -1,0 +1,27 @@
+# Java / Maven / Gradle
+target/
+*.class
+*.jar
+*.war
+*.log
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+bin/
+build/
+
+# VS Code
+.vscode/
+
+# Ambiente
+.env
+*.env.local
+*.env.production
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
